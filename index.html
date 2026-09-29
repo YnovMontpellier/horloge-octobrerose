@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Horloge Campus</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #ffdbfa;
+    --white: #fd61e8;
+    --white-dim: #FF84EF;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 22vw;
+    line-height: 1;
+    color: var(--white);
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rule {
+    width: 16vw;
+    height: 6px;
+    border-radius: 3px;
+    margin: 3vh 0 3vh 0;
+    background: linear-gradient(
+      90deg,
+      #ff1a1a 0%,
+      #ff84ef 13%,
+      #eeff57 28%,
+      #5affb6 47%,
+      #00eaff 62%,
+      #859cff 80%,
+      #4a8cff 89%,
+      #018e4d 99%
+    );
+  }
+
+  .date {
+    font-size: 3.2vw;
+    font-weight: 500;
+    color: var(--white);
+    text-align: center;
+  }
+
+  .date .rest {
+    color: var(--white-dim);
+    margin-left: 0.6ch;
+  }
+
+  .weather {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8vw;
+    margin-top: 2.4vh;
+    font-size: 1.9vw;
+    font-weight: 500;
+    color: var(--white-dim);
+  }
+
+  .weather .icon {
+    font-size: 2.6vw;
+    line-height: 1;
+  }
+
+  .weather .temp {
+    color: var(--white);
+    font-weight: 600;
+  }
+
+  .weather .city {
+    color: var(--white-dim);
+  }
+
+  .weather .sep {
+    color: var(--white-dim);
+    opacity: 0.5;
+  }
+
+  @media (max-width: 900px) {
+    .time { font-size: 26vw; }
+    .date { font-size: 5vw; }
+    .weather { font-size: 3.2vw; }
+    .weather .icon { font-size: 4.2vw; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="time" id="time">--:--</div>
+  <div class="rule"></div>
+  <div class="date" id="date">chargement…</div>
+  <div class="weather" id="weather">
+    <span class="icon" id="weather-icon">…</span>
+    <span class="temp" id="weather-temp">--°</span>
+    <span class="sep">·</span>
+    <span class="city">Montpellier</span>
+  </div>
+
+  <script>
+    const jours = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+    const mois = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+
+    function pad(n) { return n.toString().padStart(2, "0"); }
+
+    function updateClock() {
+      const now = new Date();
+      const h = pad(now.getHours());
+      const m = pad(now.getMinutes());
+      document.getElementById("time").textContent = h + ":" + m;
+
+      const jour = jours[now.getDay()];
+      const rest = now.getDate() + " " + mois[now.getMonth()] + " " + now.getFullYear();
+      document.getElementById("date").innerHTML =
+        '<span class="day">' + jour.charAt(0).toUpperCase() + jour.slice(1) + '</span>' +
+        '<span class="rest">' + rest + '</span>';
+    }
+
+    // Coordonnées de Montpellier
+    const LAT = 43.6119;
+    const LON = 3.8772;
+
+    // Table de correspondance code météo (norme WMO) -> icône + libellé
+    function weatherFromCode(code) {
+      const map = {
+        0:  ["☀️", "Ciel dégagé"],
+        1:  ["🌤️", "Peu nuageux"],
+        2:  ["⛅", "Partiellement nuageux"],
+        3:  ["☁️", "Couvert"],
+        45: ["🌫️", "Brouillard"],
+        48: ["🌫️", "Brouillard givrant"],
+        51: ["🌦️", "Bruine légère"],
+        53: ["🌦️", "Bruine"],
+        55: ["🌦️", "Bruine forte"],
+        61: ["🌧️", "Pluie légère"],
+        63: ["🌧️", "Pluie"],
+        65: ["🌧️", "Pluie forte"],
+        71: ["❄️", "Neige légère"],
+        73: ["❄️", "Neige"],
+        75: ["❄️", "Neige forte"],
+        80: ["🌦️", "Averses"],
+        81: ["🌧️", "Averses"],
+        82: ["🌧️", "Averses fortes"],
+        95: ["⛈️", "Orage"],
+        96: ["⛈️", "Orage avec grêle"],
+        99: ["⛈️", "Orage violent"]
+      };
+      return map[code] || ["🌡️", "—"];
+    }
+
+    async function updateWeather() {
+      try {
+        const url = "https://api.open-meteo.com/v1/forecast?latitude=" + LAT +
+          "&longitude=" + LON + "&current_weather=true";
+        const res = await fetch(url);
+        const data = await res.json();
+        const temp = Math.round(data.current_weather.temperature);
+        const [icon] = weatherFromCode(data.current_weather.weathercode);
+        document.getElementById("weather-icon").textContent = icon;
+        document.getElementById("weather-temp").textContent = temp + "°C";
+      } catch (e) {
+        document.getElementById("weather-icon").textContent = "🌡️";
+        document.getElementById("weather-temp").textContent = "--°";
+      }
+    }
+
+    updateClock();
+    updateWeather();
+
+    // resynchronise pile au changement de minute, puis toutes les 60s
+    const delay = (60 - new Date().getSeconds()) * 1000;
+    setTimeout(function () {
+      updateClock();
+      setInterval(updateClock, 60000);
+    }, delay);
+
+    // rafraîchit la météo toutes les 20 minutes
+    setInterval(updateWeather, 20 * 60 * 1000);
+  </script>
+
+</body>
+</html>
